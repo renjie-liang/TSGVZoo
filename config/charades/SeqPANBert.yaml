@@ -1,5 +1,6 @@
 {
   task : charades,
+
   paths: {
     ckpt_dir: ./ckpt/,
     cache_dir : ./data_pkl/,
@@ -17,24 +18,25 @@
     warmup_proportion: 0.05,
     clip_norm: 1.0
   },
-    dataprocess:{
-        video_augmentation: {
-                                unchanged: None
-                                # erosion:    0.05,
-                                # dilation:    0.05,
-                              },
-        sample_type: truncation,
-        label_threshold: 0.01
-    },
+  dataprocess:{
+      video_augmentation: {
+                              unchanged: None
+                              # erosion:    0.05,
+                              # dilation:    0.05,
+                            },
+      sample_type: truncation,
+      label_threshold: 0.01
+  },
   model: {
-    name: SeqPAN,
+    name: SeqPANBert,
     max_vlen: 64,
     max_tlen: 30,
     vdim: 1024,
     dim: 128,
-    num_heads: 8,
+    num_heads: 4,
     word_dim: 300,
     char_dim: 100,
-    droprate: 0.2
+    droprate: 0.2,
+    text_embeding: BERT, # RoBERTa, BERT
   },
 }

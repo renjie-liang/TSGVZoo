@@ -10,11 +10,12 @@
     test_path: data/charades_gt/test.json,
     val_path: ""
   },
+
   train: {
     epochs: 50,
-    batch_size: 128,
-    lr: 0.0008,
-    warmup_proportion: 0.05,
+    batch_size: 64,
+    lr: 0.0002,
+    warmup_proportion: 0.01,
     clip_norm: 1.0
   },
     dataprocess:{
@@ -23,18 +24,22 @@
                                 # erosion:    0.05,
                                 # dilation:    0.05,
                               },
-        sample_type: truncation,
+        sample_type: samelen,
         label_threshold: 0.01
     },
   model: {
-    name: SeqPAN,
-    max_vlen: 64,
+    name: VSLNet,
+    max_vlen: 128,
     max_tlen: 30,
     vdim: 1024,
     dim: 128,
     num_heads: 8,
     word_dim: 300,
     char_dim: 100,
-    droprate: 0.2
+    droprate: 0.2,
+    predictor: rnn,
   },
+  loss:{
+    highlight_lambda: 5
+  }
 }

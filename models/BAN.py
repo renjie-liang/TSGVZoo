@@ -3,10 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import time
-from .BANlib.model import VisualEncoder, QueryEncoder, CQAttention, TemporalDifference, SparseBoundaryCat, SparseMaxPool
-from .BANlib.model import DenseMaxPool, Aaptive_Proposal_Sampling, NaivePredictor, PropPositionalEncoding, Adaptive_Prop_Interaction
-from .BANlib.model import sequence2mask, temporal_difference_loss, ContrastLoss
+from models.BANLib.model import VisualEncoder, QueryEncoder, CQAttention, TemporalDifference, SparseBoundaryCat, SparseMaxPool
+from models.BANLib.model import DenseMaxPool, Aaptive_Proposal_Sampling, NaivePredictor, PropPositionalEncoding, Adaptive_Prop_Interaction
+from models.BANLib.model import sequence2mask, temporal_difference_loss, ContrastLoss
 from utils.utils import iou_n1
+from utils.BaseDataset import BaseDataset, BaseCollate
 
 
 # from transformers import BertModel
@@ -14,7 +15,7 @@ from utils.utils import iou_n1
 class BAN(nn.Module):
     def __init__(self, cfg, pre_train_emb=None):
         super(BAN, self).__init__()
-        self.vlen = cfg.model.vlen
+        self.vlen = cfg.model.max_vlen
         self.topk = cfg.model.topk
         self.neighbor = cfg.model.neighbor
         self.negative = cfg.model.negative
@@ -133,45 +134,17 @@ class BAN(nn.Module):
         # loss = self.loss(out, data, td)
         return out
 
-
-
-def collate_fn_BAN(datas):
-    from utils.data_utils import pad_seq, pad_char_seq, pad_video_seq
-    from utils.utils import convert_length_to_mask
-    
-    records, se_times, se_fracs, vfeats, words_ids = [], [], [], [], []
-    dist_idxs, map2d_contrasts, label2ds = [], [], []
-    max_vlen = datas[0]["max_vlen"]
-    for d in datas:
-        records.append(d["record"])
-        vfeats.append(d["vfeat"])
-        words_ids.append(d["words_id"])
-        dist_idxs.append(d["label1d"])
-        map2d_contrasts.append(d["map2d_contrast"])
-        se_times.append(d["se_time"])
-        se_fracs.append(d["se_frac"])
-        # label2ds.append(d["label2d"])
-
-    # process word ids
-    words_ids, _ = pad_seq(words_ids)
-    words_ids = torch.as_tensor(words_ids, dtype=torch.int64)
-    tmask = (torch.zeros_like(words_ids) != words_ids).float()
-    tlens = torch.sum(tmask, dim=1, keepdim=False, dtype=torch.int64)
-    vfeats, vlens = pad_video_seq(vfeats, max_vlen)
-    vfeats = torch.stack(vfeats)
-    vlens = torch.as_tensor(vlens, dtype=torch.int64)
-    dist_idxs = torch.stack(dist_idxs)
-    se_times = torch.as_tensor(se_times, dtype=torch.float)
-    se_fracs = torch.as_tensor(se_fracs, dtype=torch.float)
-    # label2ds = torch.stack(label2ds)
-
-    # process labels
-    num_clips = max_vlen
-    start_end_offset, iou2ds = [], []
-    for recor in records:
-        duration = recor["duration"]
-        moment = recor["se_time"]
+class BANDataset(BaseDataset):
+    def __init__(self, dataset, video_features, configs, loadertype):
+        super().__init__(dataset, video_features, configs, loadertype)
+    def __getitem__(self, index):
+        res = BaseDataset.__getitem__(self, index)
+        map2d_contrast = self.get_map2d_contrast(res['se_idx'][0], res['se_idx'][1])
+        
+        duration = res["record"]["duration"]
+        moment = res["se_time"]
         moment = torch.as_tensor(moment)
+        num_clips = res["max_vlen"]
         
         iou2d = torch.ones(num_clips, num_clips)
         grids = iou2d.nonzero(as_tuple=False)    
@@ -182,33 +155,56 @@ def collate_fn_BAN(datas):
         se_offset[:, :, 0] = ((moment[0] - candidates[:, 0]) / duration).reshape(num_clips, num_clips)
         se_offset[:, :, 1] = ((moment[1] - candidates[:, 1]) / duration).reshape(num_clips, num_clips)
 
-        start_end_offset.append(se_offset)
-        iou2ds.append(iou2d)
+        res["map2d_contrast"] = map2d_contrast
+        res["iou2d"] = iou2d
+        res["se_offset"] = se_offset
+        return res
+    
+    def get_map2d_contrast(self, sidx, eidx):
+        num_clips = self.max_vlen
+        x, y = np.arange(0, sidx + 1., dtype=int), np.arange(eidx - 1, num_clips, dtype=int)
+        mask2d_pos = np.zeros((num_clips, num_clips), dtype=bool)
+        mask_idx = np.array(np.meshgrid(x, y)).T.reshape(-1, 2)
+        mask2d_pos[mask_idx[:, 0], mask_idx[:, 1]] = 1
 
-    iou2ds = torch.stack(iou2ds)
-    start_end_offset = torch.stack(start_end_offset)
-    map2d_contrasts = torch.stack(map2d_contrasts)
-    res = {'words_ids': words_ids,
-            'tlens': tlens,
-            'vfeats': vfeats,
-            'vlens': vlens,
-            'start_end_offset': start_end_offset,
-            'iou2ds': iou2ds,
-            # 'label2ds': label2ds,
-            'dist_idxs': dist_idxs,
-            'map2d_contrasts': map2d_contrasts,
-            'se_times': se_times,
-            'se_fracs': se_fracs,
-            }
+        mask2d_neg = np.zeros((num_clips, num_clips), dtype=bool)
+        for offset in range(sidx):
+            i, j = range(0, sidx - offset), range(offset, sidx)
+            mask2d_neg[i, j] = 1
+        for offset in range(eidx):
+            i, j = range(eidx, num_clips - offset), range(eidx + offset, num_clips)
+            mask2d_neg[i, j] = 1
+        if np.sum(mask2d_neg) == 0:
+            mask2d_neg[0, 0] = 1
+            mask2d_neg[num_clips - 1, num_clips - 1] = 1
+        return torch.tensor(np.array([mask2d_pos, mask2d_neg]))
 
-    return res, records
+    
+    
+class BANCollate(BaseCollate):
+    def __call__(self, datas):
+        res, records = super().__call__(datas)
+        res["vlens"] = res["vmasks"].sum(dim=-1)
+        res["tlens"] = torch.sum(res["tmasks"], dim=1, keepdim=False, dtype=torch.int64)
+                
+        start_end_offset, iou2ds, map2d_contrasts = [], [], []
+        for r in datas:
+            map2d_contrasts.append(r["map2d_contrast"])
+            start_end_offset.append(r["se_offset"])
+            iou2ds.append(r["iou2d"])
+                      
+        res['map2d_contrasts'] = torch.stack(map2d_contrasts)  
+        res['start_end_offset'] = torch.stack(start_end_offset)
+        res['iou2ds'] = torch.stack(iou2ds)
+      
+        return res, records
 
 
 def scale(iou, min_iou, max_iou):
     return (iou - min_iou) / (max_iou - min_iou)
 
 
-def train_engine_BAN(model, data, configs):
+def train_engine_BAN(model, data, configs, runtype):
     data = {key: value.to(configs.device) for key, value in data.items()}
     out = model(data['vfeats'], data['words_ids'], data['vlens'], data['tlens'], data['start_end_offset'])
 
@@ -238,7 +234,7 @@ def train_engine_BAN(model, data, configs):
 
     # distribute differe
 
-    dist_idxs =  data['dist_idxs']
+    dist_idxs =  data['label_1Ds']
     td = out['td']
     td_mask = dist_idxs.sum(dim=1)
     loss_td = temporal_difference_loss(td, td_mask)

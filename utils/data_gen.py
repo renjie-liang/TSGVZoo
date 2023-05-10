@@ -81,7 +81,9 @@ def vocab_emb_gen(datasets, emb_path):
 
 def load_dataset(configs):
     os.makedirs(configs.paths.cache_dir, exist_ok=True)
-    cache_path = os.path.join(configs.paths.cache_dir, '{}_{}.pkl'.format(configs.task,configs.suffix))
+    feat_version = os.path.split(configs.paths.feature_path)[-1]
+    cache_path = '_'.join([configs.task, configs.model.name, str(configs.model.max_vlen),  feat_version]) + '.pkl'
+    cache_path = os.path.join(configs.paths.cache_dir, cache_path)
     if not os.path.exists(cache_path):
         generate_dataset(configs, cache_path)
     return load_pickle(cache_path)
@@ -95,7 +97,7 @@ def get_vfeat_len(configs):
         tmp = os.path.split(vpath)
         vid = tmp[-1][:-4]
         vfeat_lens[vid] = np.load(vpath).shape[0]
-        # vfeat_lens[vid] = min(configs.model.vlen, np.load(vpath).shape[0])
+        # vfeat_lens[vid] = min( configs.model.max_vlen, np.load(vpath).shape[0])
     return vfeat_lens 
 
 
@@ -163,13 +165,13 @@ def generate_dataset(configs, cache_path):
 
     # generate dataset
     word_dict, char_dict, vectors = vocab_emb_gen(data_list, configs.paths.glove_path)
-    train_set = dataset_gen(train_data, vfeat_lens, word_dict, char_dict, configs.model.tlen, 'train')
-    test_set = dataset_gen(test_data, vfeat_lens, word_dict, char_dict, configs.model.tlen, 'test')
+    train_set = dataset_gen(train_data, vfeat_lens, word_dict, char_dict, configs.model.max_tlen, 'train')
+    test_set = dataset_gen(test_data, vfeat_lens, word_dict, char_dict, configs.model.max_tlen, 'test')
     if configs.paths.val_path == '':
         val_set = None
         n_val = 0 
     else:
-        val_set = dataset_gen(val_data, vfeat_lens, word_dict, char_dict, configs.model.tlen, 'val')
+        val_set = dataset_gen(val_data, vfeat_lens, word_dict, char_dict, configs.model.max_tlen, 'val')
         n_val = len(val_set)
 
     # save dataset

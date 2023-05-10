@@ -1,5 +1,6 @@
 {
   task : charades,
+
   paths: {
     ckpt_dir: ./ckpt/,
     cache_dir : ./data_pkl/,
@@ -10,6 +11,7 @@
     test_path: data/charades_gt/test.json,
     val_path: ""
   },
+
   train: {
     epochs: 50,
     batch_size: 128,
@@ -27,12 +29,12 @@
         label_threshold: 0.01
     },
   model: {
-    name: SeqPAN,
+    name: SeqPANBackBone,
     max_vlen: 64,
     max_tlen: 30,
     vdim: 1024,
     dim: 128,
-    num_heads: 8,
+    num_heads: 4,
     word_dim: 300,
     char_dim: 100,
     droprate: 0.2
