@@ -1,0 +1,5 @@
+torch==1.13.1
+numpy==1.21.2
+easydict==1.9
+tqdm==4.63.0
+PyYAML==6.0
