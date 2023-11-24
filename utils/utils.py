@@ -8,6 +8,7 @@ import logging
 import os
 import yaml
 import math
+import h5py
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""

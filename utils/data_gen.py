@@ -8,6 +8,10 @@ from nltk.tokenize import word_tokenize
 # from util.data_util import load_json, load_lines, load_pickle, save_pickle, time_to_index
 from utils.utils import load_json, load_pickle, save_pickle, time_idx
 import glob
+import h5py
+# import nltk
+# nltk.download('punkt')
+
 
 PAD, UNK = "<PAD>", "<UNK>"
 
@@ -81,25 +85,21 @@ def vocab_emb_gen(datasets, emb_path):
 
 def load_dataset(configs):
     os.makedirs(configs.paths.cache_dir, exist_ok=True)
-    feat_version = os.path.split(configs.paths.feature_path)[-1]
-    cache_path = '_'.join([configs.task, configs.model.name, str(configs.model.max_vlen),  feat_version]) + '.pkl'
+    feat_version = os.path.split(configs.paths.feature_file)[-1]
+    glove_number = configs.paths.glove_path.split(".")[-3]
+    cache_path = '_'.join([configs.task, configs.model.name, glove_number, str(configs.model.max_vlen),  feat_version]) + '.pkl'
     cache_path = os.path.join(configs.paths.cache_dir, cache_path)
     if not os.path.exists(cache_path):
         generate_dataset(configs, cache_path)
     return load_pickle(cache_path)
 
-
 def get_vfeat_len(configs):
-    feature_dir = configs.paths.feature_path
-    vlen_list = glob.glob(os.path.join(feature_dir, "*.npy"))
     vfeat_lens = {}
-    for vpath in tqdm(vlen_list, desc="get video feature lengths"):
-        tmp = os.path.split(vpath)
-        vid = tmp[-1][:-4]
-        vfeat_lens[vid] = np.load(vpath).shape[0]
-        # vfeat_lens[vid] = min( configs.model.max_vlen, np.load(vpath).shape[0])
-    return vfeat_lens 
-
+    with h5py.File(configs.paths.feature_file, 'r') as data:
+        for key in data.keys():
+            feature_length = len(data[key])
+            vfeat_lens[key] = feature_length
+    return vfeat_lens
 
 def dataset_gen(data, vfeat_lens, word_dict, char_dict, max_tlen, scope):
     dataset = list()

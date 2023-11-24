@@ -54,7 +54,7 @@ configs.num_chars = dataset['n_chars']
 configs.num_words = dataset['n_words']
 
 # get train and test loader
-visual_features = VideoFeatureDict(configs.paths.feature_path, configs.model.max_vlen, args.debug)
+visual_features = VideoFeatureDict(configs.paths.feature_file, configs.model.max_vlen, args.debug)
 train_loader = get_loader(dataset['train_set'], visual_features, configs, loadertype="train")
 test_loader = get_loader(dataset['test_set'], visual_features, configs, loadertype="test")
 # train_nosuffle_loader = get_loader(dataset=dataset['train_set'], video_features=visual_features, configs=configs, loadertype="test")
@@ -100,9 +100,9 @@ if args.mode == "train":
             best2 = tri[3]
             best2_line = "\n" +  train_line + "\n" + test_line 
             
-    logger.info("\n\nR1i7 in IID")
+    logger.info("\n\nBest R1i7")
     logger.info(best1_line)
-    logger.info("\nR1i7 in OOD")
+    logger.info("\nBest mIoU")
     logger.info(best2_line)
 
 

@@ -27,8 +27,7 @@ There are many draft codes, we don't test the robustness. Especially the part of
 <br>
 
 ### Video Feature
-To download the video feature, please refer to https://github.com/IsaacChanghau/SeqPAN. It is possible to save the video feature in any preferred location.
-Adjust "paths" value within the ./config/anet/SeqPAN.yaml.
+Download the video feature from https://huggingface.co/datasets/k-nick/NLVL. We collect several version feature for Charades, ActivityNet, and Tacos. Then modify "paths" value within the ./config/anet/SeqPAN.yaml.
 <br>
 
 ## Quick Start

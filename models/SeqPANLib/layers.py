@@ -4,6 +4,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from models.BaseLib.layers import mask_logits
 
+
+
+
+
 class Conv1D(nn.Module):
     def __init__(self, in_dim, out_dim, kernel_size=1, stride=1, padding=0, bias=True, activation=None):
         super(Conv1D, self).__init__()
@@ -141,18 +145,38 @@ class DepthwiseSeparableConvBlock(nn.Module):
 
 
 
-class SeparableConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, bias=False):
-        super(SeparableConv2d, self).__init__()
-        self.depthwise = nn.Conv2d(in_channels, in_channels, kernel_size=kernel_size, 
-                                groups=in_channels, bias=bias, padding=1)
-        self.pointwise = nn.Conv2d(in_channels, out_channels, 
-                                kernel_size=1, bias=bias)
+# class SeparableConv2d(nn.Module):
+#     def __init__(self, in_channels, out_channels, kernel_size, bias=False):
+#         super(SeparableConv2d, self).__init__()
+#         self.depthwise = nn.Conv2d(in_channels, in_channels, kernel_size=kernel_size, 
+#                                 groups=in_channels, bias=bias, padding=1)
+#         self.pointwise = nn.Conv2d(in_channels, out_channels, 
+#                                 kernel_size=1, bias=bias)
 
+#     def forward(self, x):
+#         out = self.depthwise(x)
+#         out = self.pointwise(out)
+#         return out
+
+# wang jing
+class SeparableConv2D(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=3, channel_multiplier=1, padding=0, bias=False) -> None:
+        super().__init__()
+
+        self.depthwise_conv = nn.Conv2d(in_channels,
+                                        channel_multiplier * in_channels,
+                                        kernel_size,
+                                        padding=padding,
+                                        groups=in_channels,
+                                        bias=bias)
+        self.pointwise_conv = nn.Conv2d(in_channels * channel_multiplier, out_channels, 1, bias=bias)
     def forward(self, x):
-        out = self.depthwise(x)
-        out = self.pointwise(out)
-        return out
+        x0 = self.depthwise_conv(x)
+        x1 = self.pointwise_conv(x0)
+        return x0, x1
+
+
+
 
 class DepthwiseSeparableConvBlock2(nn.Module):
     def __init__(self, dim, kernel_size, droprate, num_layers=4):

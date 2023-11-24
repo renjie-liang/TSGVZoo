@@ -8,28 +8,37 @@ import torch
 import torch.nn.functional as F  
 import random
 from utils.utils import frac_idx
-
+import h5py
 
 class VideoFeatureDict():
-    def __init__(self, root, max_vlen, debug):
+    def __init__(self, feat_name, max_vlen, debug):
         self.debug = debug
         self.path_dict = dict()
         self.video_features = dict()
-        filenames = glob.glob(os.path.join(root, "*.npy"))
+        # filenames = glob.glob(os.path.join(root, "*.npy"))
         self.max_vlen = max_vlen
         # self.sample_method = sample_method
 
         if debug:
-            for filename in tqdm(filenames, total=len(filenames), desc="load video path"):
+            for filename in tqdm(feat_name, total=len(feat_name), desc="load video path"):
                 video_id = filename.split("/")[-1].split(".")[0]
                 self.path_dict[video_id] = filename
         else:
-            for filename in tqdm(filenames, total=len(filenames), desc="load video features"):
-                video_id = filename.split("/")[-1].split(".")[0]
-                feature = np.load(filename)
-                feature = torch.FloatTensor(feature)
-                self.video_features[video_id] = feature
-
+            with h5py.File(feat_name, 'r') as data:
+                    for key in data.keys():
+                        video_id = key 
+                        feature = data[key][:] 
+                        feature_tensor = torch.FloatTensor(feature)
+                        self.video_features[video_id] = feature_tensor
+                
+            # for filename in tqdm(filenames, total=len(filenames), desc="load video features"):
+            #     video_id = filename.split("/")[-1].split(".")[0]
+            #     feature = np.load(filename)
+            #     feature = torch.FloatTensor(feature)
+            #     self.video_features[video_id] = feature
+                
+                
+                
     def __getitem__(self, k):
         if self.debug:
             filename = self.path_dict[k]
